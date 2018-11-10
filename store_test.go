@@ -1,12 +1,10 @@
 package eventsource_test
 
 import (
+	"sort"
 	"testing"
 
-	"sort"
-
-	"github.com/altairsix/eventsource"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
 )
 
 func TestHistory_Swap(t *testing.T) {
@@ -17,7 +15,13 @@ func TestHistory_Swap(t *testing.T) {
 	}
 
 	sort.Sort(history)
-	assert.Equal(t, 1, history[0].Version)
-	assert.Equal(t, 2, history[1].Version)
-	assert.Equal(t, 3, history[2].Version)
+	if got, want := history[0].Version, 1; got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+	if got, want := history[1].Version, 2; got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+	if got, want := history[2].Version, 3; got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
 }

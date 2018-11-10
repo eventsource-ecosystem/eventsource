@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/altairsix/eventsource"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
 )
 
 func TestEvent(t *testing.T) {
@@ -15,7 +14,13 @@ func TestEvent(t *testing.T) {
 		At:      time.Now(),
 	}
 
-	assert.Equal(t, m.ID, m.AggregateID())
-	assert.Equal(t, m.Version, m.EventVersion())
-	assert.Equal(t, m.At, m.EventAt())
+	if got, want := m.AggregateID(), m.ID; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := m.EventVersion(), m.Version; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := m.EventAt(), m.At; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 }

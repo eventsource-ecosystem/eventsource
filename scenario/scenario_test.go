@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/altairsix/eventsource"
-	"github.com/altairsix/eventsource/scenario"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
+	"github.com/eventsource-ecosystem/eventsource/scenario"
 )
 
 //Order is an example of state generated from left fold of events
@@ -84,10 +83,16 @@ func (item *Order) Apply(ctx context.Context, command eventsource.Command) ([]ev
 }
 
 func TestSimpleScenario(t *testing.T) {
-	scenario.New(t, &Order{}).
+	var (
+		prototype = &Order{}
+		command   = &CreateOrder{}
+		event     = &OrderCreated{}
+	)
+
+	scenario.New(t, prototype).
 		Given().
-		When(&CreateOrder{}).
-		Then(&OrderCreated{})
+		When(command).
+		Then(event)
 }
 
 type Errors struct {
@@ -110,6 +115,10 @@ func TestFieldError(t *testing.T) {
 			&OrderCreated{Model: eventsource.Model{ID: id + "junk"}},
 		)
 
-	assert.Len(t, errs.Messages, 1)
-	assert.True(t, strings.Contains(errs.Messages[0], "junk"))
+	if got, want := len(errs.Messages), 1; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := errs.Messages[0], "junk"; !strings.Contains(got, want) {
+		t.Fatalf("expected %v to contain %v", got, want)
+	}
 }

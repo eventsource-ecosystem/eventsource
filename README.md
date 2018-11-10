@@ -15,7 +15,7 @@ library.  What AWS can handle, I'd rather have AWS handle.
 ## Installation
 
 ```
-go get github.com/altairsix/eventsource/...
+go get github.com/eventsource-ecosystem/eventsource
 ```
 
 ## Getting Started
@@ -116,11 +116,5 @@ The ```scenario``` package simplifies testing.
         Then(&OrderCreated{})   // expect the following events to be emitted
 ```
 
-### Todo 
 
-- [ ] document singleton usage
-- [ ] implement dynamodb to sns lambda function
-- [ ] implement dynamodb to kinesis firehose lambda function
-- [ ] document stream replay via s3
-- [ ] add support for terraform in tooling
 

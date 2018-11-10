@@ -1,30 +1,45 @@
 package eventsource_test
 
 import (
+	"errors"
+	"fmt"
 	"io"
+	"reflect"
 	"testing"
 
-	"fmt"
-
-	"github.com/altairsix/eventsource"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
 )
 
 func TestNewError(t *testing.T) {
 	err := eventsource.NewError(io.EOF, "code", "hello %v", "world")
-	assert.NotNil(t, err)
+	if err == nil {
+		t.Fatalf("got nil; want not nil")
+	}
 
 	v, ok := err.(eventsource.Error)
-	assert.True(t, ok)
-	assert.Equal(t, io.EOF, v.Cause())
-	assert.Equal(t, "code", v.Code())
-	assert.Equal(t, "hello world", v.Message())
-	assert.Equal(t, "[code] hello world - EOF", v.Error())
+	if !ok {
+		t.Fatalf("got false; want true")
+	}
+	if got, want := v.Cause(), io.EOF; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := v.Code(), "code"; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := v.Message(), "hello world"; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	if got, want := v.Error(), "[code] hello world - EOF"; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 
 	s, ok := err.(fmt.Stringer)
-	assert.True(t, ok)
-	assert.Equal(t, v.Error(), s.String())
+	if !ok {
+		t.Fatalf("got false; want true")
+	}
+	if got, want := s.String(), v.Error(); got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 }
 
 func TestIsNotFound(t *testing.T) {
@@ -52,7 +67,9 @@ func TestIsNotFound(t *testing.T) {
 
 	for label, tc := range testCases {
 		t.Run(label, func(t *testing.T) {
-			assert.Equal(t, tc.IsNotFound, eventsource.IsNotFound(tc.Err))
+			if got, want := eventsource.IsNotFound(tc.Err), tc.IsNotFound; got != want {
+				t.Fatalf("got %v; want %v", got, want)
+			}
 		})
 	}
 }
@@ -80,7 +97,9 @@ func TestErrHasCode(t *testing.T) {
 
 	for label, tc := range testCases {
 		t.Run(label, func(t *testing.T) {
-			assert.Equal(t, tc.ErrHasCode, eventsource.ErrHasCode(tc.Err, code))
+			if got, want := eventsource.ErrHasCode(tc.Err, code), tc.ErrHasCode; !reflect.DeepEqual(got, want) {
+				t.Fatalf("got %v; want %v", got, want)
+			}
 		})
 	}
 }

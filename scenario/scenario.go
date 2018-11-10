@@ -3,10 +3,15 @@ package scenario
 import (
 	"context"
 	"reflect"
+	"strings"
 
-	"github.com/altairsix/eventsource"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
 )
+
+// TestingT is a wrapper for *testing.T
+type TestingT interface {
+	Errorf(format string, args ...interface{})
+}
 
 // CommandHandlerAggregate implements both Aggregate and CommandHandler
 type CommandHandlerAggregate interface {
@@ -16,7 +21,7 @@ type CommandHandlerAggregate interface {
 
 // Builder captures the data used to execute a test scenario
 type Builder struct {
-	t         assert.TestingT
+	t         TestingT
 	aggregate CommandHandlerAggregate
 	given     []eventsource.Event
 	command   eventsource.Command
@@ -54,7 +59,9 @@ func (b *Builder) apply() ([]eventsource.Event, error) {
 
 	// given
 	for _, e := range b.given {
-		assert.Nil(b.t, aggregate.On(e))
+		if got := aggregate.On(e); got != nil {
+			b.t.Errorf("got %v; want nil", got)
+		}
 	}
 
 	// when
@@ -62,10 +69,11 @@ func (b *Builder) apply() ([]eventsource.Event, error) {
 	return aggregate.Apply(ctx, b.command)
 }
 
-func deepEquals(t assert.TestingT, expected, actual interface{}) bool {
+// deepEquals (unlike reflect.DeepEqual) only performs a deep equality check on non-zero fields
+func deepEquals(t TestingT, expected, actual interface{}, path ...string) bool {
 	te := reflect.TypeOf(expected)
 	ta := reflect.TypeOf(actual)
-	if !assert.Equal(t, te, ta) {
+	if got, want := ta, te; !reflect.DeepEqual(got, want) {
 		return false
 	}
 
@@ -84,6 +92,7 @@ func deepEquals(t assert.TestingT, expected, actual interface{}) bool {
 	}
 
 	for i := 0; i < te.NumField(); i++ {
+		fieldName := te.Field(i).Name
 		fieldType := te.Field(i).Type
 		if fieldType.Kind() == reflect.Ptr {
 			fieldType = fieldType.Elem()
@@ -100,13 +109,14 @@ func deepEquals(t assert.TestingT, expected, actual interface{}) bool {
 		}
 
 		if fieldType.Kind() == reflect.Struct {
-			if ok := deepEquals(t, fe.Interface(), fa.Interface()); !ok {
+			if got, want := fa.Interface(), fe.Interface(); !deepEquals(t, got, want, append(path, fieldName)...) {
 				return false
 			}
 			continue
 		}
 
-		if ok := assert.Equal(t, fe.Interface(), fa.Interface()); !ok {
+		if got, want := fa.Interface(), fe.Interface(); !reflect.DeepEqual(got, want) {
+			t.Errorf("%v.%v: got %v; want %v", strings.Join(path, "."), fieldName, got, want)
 			return false
 		}
 	}
@@ -119,11 +129,13 @@ func deepEquals(t assert.TestingT, expected, actual interface{}) bool {
 // event type will be checked
 func (b *Builder) Then(expected ...eventsource.Event) {
 	actual, err := b.apply()
-	assert.Nil(b.t, err)
+	if err != nil {
+		b.t.Errorf("got %v; want nil", err)
+	}
 
 	// then
-	if len(expected) != len(actual) {
-		assert.Equal(b.t, expected, actual)
+	if got, want := len(actual), len(expected); got != want {
+		b.t.Errorf("got %v; want %v", got, want)
 		return
 	}
 
@@ -137,11 +149,13 @@ func (b *Builder) Then(expected ...eventsource.Event) {
 // the function expectation
 func (b *Builder) ThenError(matches func(err error) bool) {
 	_, err := b.apply()
-	assert.True(b.t, matches(err))
+	if got := matches(err); !got {
+		b.t.Errorf("got false; want true")
+	}
 }
 
 // New constructs a new scenario
-func New(t assert.TestingT, prototype CommandHandlerAggregate) *Builder {
+func New(t TestingT, prototype CommandHandlerAggregate) *Builder {
 	return &Builder{
 		t:         t,
 		aggregate: prototype,

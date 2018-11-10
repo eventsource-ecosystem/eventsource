@@ -2,13 +2,13 @@ package eventsource_test
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
+	"reflect"
 	"testing"
 	"time"
 
-	"github.com/altairsix/eventsource"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
+	"github.com/eventsource-ecosystem/eventsource"
 )
 
 type Entity struct {
@@ -78,8 +78,14 @@ func (item *Entity) Apply(ctx context.Context, command eventsource.Command) ([]e
 func TestNew(t *testing.T) {
 	repository := eventsource.New(&Entity{})
 	aggregate := repository.New()
-	assert.NotNil(t, aggregate)
-	assert.Equal(t, &Entity{}, aggregate)
+	if got := aggregate; got == nil {
+		t.Fatalf("got nil; want not nil")
+	}
+
+	want := &Entity{}
+	if got := aggregate; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v; want not %v", got, want)
+	}
 }
 
 func TestRepository_Load_NotFound(t *testing.T) {
@@ -89,8 +95,12 @@ func TestRepository_Load_NotFound(t *testing.T) {
 	)
 
 	_, err := repository.Load(ctx, "does-not-exist")
-	assert.NotNil(t, err)
-	assert.True(t, eventsource.IsNotFound(err))
+	if err == nil {
+		t.Fatalf("got nil; want not nil")
+	}
+	if !eventsource.IsNotFound(err) {
+		t.Fatalf("got false; want true")
+	}
 }
 
 func TestRegistry(t *testing.T) {
@@ -119,15 +129,25 @@ func TestRegistry(t *testing.T) {
 				Name:  name,
 			},
 		)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		v, err := repository.Load(ctx, id)
-		assert.Nil(t, err, "expected successful load")
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		org, ok := v.(*Entity)
-		assert.True(t, ok)
-		assert.Equal(t, id, org.ID, "expected restored id")
-		assert.Equal(t, name, org.Name, "expected restored name")
+		if !ok {
+			t.Fatalf("got false; want true")
+		}
+		if got, want := org.ID, id; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+		if got, want := org.Name, name; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
 
 		// Test - Update the org name and verify that the change is reflected in the loaded result
 
@@ -136,15 +156,25 @@ func TestRegistry(t *testing.T) {
 			Model: eventsource.Model{ID: id, Version: 2},
 			Name:  updated,
 		})
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		v, err = repository.Load(ctx, id)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		org, ok = v.(*Entity)
-		assert.True(t, ok)
-		assert.Equal(t, id, org.ID)
-		assert.Equal(t, updated, org.Name)
+		if !ok {
+			t.Fatalf("got false; want true")
+		}
+		if got, want := org.ID, id; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+		if got, want := org.Name, updated; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
 	})
 
 	t.Run("with pointer prototype", func(t *testing.T) {
@@ -161,11 +191,17 @@ func TestRegistry(t *testing.T) {
 				Name:  name,
 			},
 		)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		v, err := registry.Load(ctx, id)
-		assert.Nil(t, err)
-		assert.Equal(t, name, v.(*Entity).Name)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+		if got, want := v.(*Entity).Name, name; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
 	})
 
 	t.Run("with pointer bind", func(t *testing.T) {
@@ -179,11 +215,17 @@ func TestRegistry(t *testing.T) {
 				Name:  name,
 			},
 		)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		v, err := registry.Load(ctx, id)
-		assert.Nil(t, err)
-		assert.Equal(t, name, v.(*Entity).Name)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+		if got, want := v.(*Entity).Name, name; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
 	})
 }
 
@@ -200,24 +242,34 @@ func TestAt(t *testing.T) {
 			Model: eventsource.Model{ID: id, Version: 1, At: time.Now()},
 		},
 	)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	v, err := registry.Load(ctx, id)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	org := v.(*Entity)
-	assert.NotZero(t, org.CreatedAt)
-	assert.NotZero(t, org.UpdatedAt)
+	if org.CreatedAt.IsZero() {
+		t.Fatalf("got %v; want zero", org.CreatedAt)
+	}
+	if org.UpdatedAt.IsZero() {
+		t.Fatalf("got %v; want zero", org.UpdatedAt)
+	}
 }
 
 func TestRepository_SaveNoEvents(t *testing.T) {
 	repository := eventsource.New(&Entity{})
 	err := repository.Save(context.Background())
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 }
 
 func TestWithObservers(t *testing.T) {
-	captured := []eventsource.Event{}
+	var captured []eventsource.Event
 	observer := func(event eventsource.Event) {
 		captured = append(captured, event)
 	}
@@ -241,11 +293,17 @@ func TestWithObservers(t *testing.T) {
 	})
 
 	// Then I expect event to be captured
-	assert.Nil(t, err)
-	assert.Len(t, captured, 1)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if got, want := len(captured), 1; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 
 	_, ok := captured[0].(*EntityCreated)
-	assert.True(t, ok)
+	if !ok {
+		t.Fatalf("got false; want true")
+	}
 }
 
 func TestApply(t *testing.T) {
@@ -261,17 +319,21 @@ func TestApply(t *testing.T) {
 
 	// When
 	version, err := repo.Apply(context.Background(), cmd)
-
-	// Then
-	assert.Nil(t, err)
-	assert.Equal(t, 1, version)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if got, want := version, 1; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 
 	// And
 	version, err = repo.Apply(context.Background(), cmd)
-
-	// Then
-	assert.Nil(t, err)
-	assert.Equal(t, 2, version)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if got, want := version, 2; got != want {
+		t.Fatalf("got %v; want %v", got, want)
+	}
 }
 
 func TestApplyNopCommand(t *testing.T) {
@@ -288,7 +350,11 @@ func TestApplyNopCommand(t *testing.T) {
 			CommandModel: eventsource.CommandModel{ID: "abc"},
 		}
 		version, err := repo.Apply(context.Background(), cmd)
-		assert.Nil(t, err)
-		assert.Equal(t, 0, version)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+		if got, want := version, 0; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
 	})
 }
