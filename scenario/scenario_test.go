@@ -3,6 +3,7 @@ package scenario_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -120,5 +121,11 @@ func TestFieldError(t *testing.T) {
 	}
 	if got, want := errs.Messages[0], "junk"; !strings.Contains(got, want) {
 		t.Fatalf("expected %v to contain %v", got, want)
+	}
+}
+
+func TestDeepEquals(t *testing.T) {
+	if got, want := reflect.DeepEqual([]uint8(nil), []byte(nil)), true; got != want {
+		t.Fatalf("got %v; want %v", got, want)
 	}
 }

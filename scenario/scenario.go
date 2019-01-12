@@ -104,7 +104,7 @@ func deepEquals(t TestingT, expected, actual interface{}, path ...string) bool {
 		if !fe.CanInterface() || !fa.CanInterface() {
 			continue
 		}
-		if zero := reflect.Zero(fieldType).Interface(); zero == fe.Interface() {
+		if zero := reflect.Zero(fieldType).Interface(); reflect.DeepEqual(zero, fe.Interface()) {
 			continue
 		}
 
