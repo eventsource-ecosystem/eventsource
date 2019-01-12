@@ -90,7 +90,7 @@ func TestSimpleScenario(t *testing.T) {
 		event     = &OrderCreated{}
 	)
 
-	scenario.New(t, prototype).
+	scenario.Test(t, prototype).
 		Given().
 		When(command).
 		Then(event)
@@ -105,23 +105,53 @@ func (e *Errors) Errorf(format string, args ...interface{}) {
 }
 
 func TestFieldError(t *testing.T) {
-	errs := &Errors{}
-	id := "abc"
-	scenario.New(errs, &Order{}).
-		Given().
-		When(
-			&CreateOrder{CommandModel: eventsource.CommandModel{ID: id}},
-		).
-		Then(
-			&OrderCreated{Model: eventsource.Model{ID: id + "junk"}},
-		)
+	const id = "abc"
 
-	if got, want := len(errs.Messages), 1; got != want {
-		t.Fatalf("got %v; want %v", got, want)
-	}
-	if got, want := errs.Messages[0], "junk"; !strings.Contains(got, want) {
-		t.Fatalf("expected %v to contain %v", got, want)
-	}
+	t.Run("ok", func(t *testing.T) {
+		errs := &Errors{}
+		scenario.Test(errs, &Order{}).
+			When(
+				&CreateOrder{CommandModel: eventsource.CommandModel{ID: id}},
+			).
+			Then(
+				&OrderCreated{Model: eventsource.Model{ID: id + "junk"}},
+			)
+
+		if got, want := len(errs.Messages), 1; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+		if got, want := errs.Messages[0], "junk"; !strings.Contains(got, want) {
+			t.Fatalf("expected %v to contain %v", got, want)
+		}
+	})
+
+	t.Run("fail - expect order shipped", func(t *testing.T) {
+		errs := &Errors{}
+		scenario.Test(errs, &Order{}).
+			When(
+				&CreateOrder{CommandModel: eventsource.CommandModel{ID: id}},
+			).
+			Then(
+				&OrderShipped{Model: eventsource.Model{ID: id, Version: 1}},
+			)
+
+		if got, want := len(errs.Messages), 1; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+		if got, want := errs.Messages[0], "got OrderCreated; want OrderShipped"; !strings.Contains(got, want) {
+			t.Fatalf("expected %v to contain %v", got, want)
+		}
+	})
+
+	t.Run("pass", func(t *testing.T) {
+		scenario.Test(t, &Order{}).
+			When(
+				&CreateOrder{CommandModel: eventsource.CommandModel{ID: id}},
+			).
+			Then(
+				&OrderCreated{Model: eventsource.Model{ID: id, Version: 1}},
+			)
+	})
 }
 
 func TestDeepEquals(t *testing.T) {

@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -70,15 +71,20 @@ func (b *Builder) apply() ([]eventsource.Event, error) {
 }
 
 // deepEquals (unlike reflect.DeepEqual) only performs a deep equality check on non-zero fields
-func deepEquals(t TestingT, expected, actual interface{}, path ...string) bool {
+func deepEquals(t TestingT, expected, actual interface{}, path ...string) error {
 	te := reflect.TypeOf(expected)
 	ta := reflect.TypeOf(actual)
-	if got, want := ta, te; !reflect.DeepEqual(got, want) {
-		return false
-	}
 
 	if te.Kind() == reflect.Ptr {
 		te = te.Elem()
+	}
+
+	if ta.Kind() == reflect.Ptr {
+		ta = ta.Elem()
+	}
+
+	if got, want := ta, te; !reflect.DeepEqual(got, want) {
+		return fmt.Errorf("got %v; want %v", got.Name(), want.Name())
 	}
 
 	ve := reflect.ValueOf(expected)
@@ -109,19 +115,19 @@ func deepEquals(t TestingT, expected, actual interface{}, path ...string) bool {
 		}
 
 		if fieldType.Kind() == reflect.Struct {
-			if got, want := fa.Interface(), fe.Interface(); !deepEquals(t, got, want, append(path, fieldName)...) {
-				return false
+			got, want := fa.Interface(), fe.Interface()
+			if err := deepEquals(t, got, want, append(path, fieldName)...); err != nil {
+				return err
 			}
 			continue
 		}
 
 		if got, want := fa.Interface(), fe.Interface(); !reflect.DeepEqual(got, want) {
-			t.Errorf("%v.%v: got %v; want %v", strings.Join(path, "."), fieldName, got, want)
-			return false
+			return fmt.Errorf("%v.%v: got %v; want %v", strings.Join(path, "."), fieldName, got, want)
 		}
 	}
 
-	return true
+	return nil
 }
 
 // Then check that the command returns the following events.  Only non-zero valued
@@ -139,9 +145,12 @@ func (b *Builder) Then(expected ...eventsource.Event) {
 		return
 	}
 
-	for index, e := range expected {
-		a := actual[index]
-		deepEquals(b.t, e, a)
+	for index, want := range expected {
+		got := actual[index]
+		if err := deepEquals(b.t, want, got); err != nil {
+			b.t.Errorf(err.Error())
+			return
+		}
 	}
 }
 
@@ -155,9 +164,14 @@ func (b *Builder) ThenError(matches func(err error) bool) {
 }
 
 // New constructs a new scenario
-func New(t TestingT, prototype CommandHandlerAggregate) *Builder {
+func Test(t TestingT, prototype CommandHandlerAggregate) *Builder {
 	return &Builder{
 		t:         t,
 		aggregate: prototype,
 	}
+}
+
+// deprecated - use Test instead
+func New(t TestingT, prototype CommandHandlerAggregate) *Builder {
+	return Test(t, prototype)
 }
