@@ -51,7 +51,7 @@ type Store interface {
 // the SaveAggregate will always be called instead of Store
 type StoreAggregate interface {
 	// Save the provided serialized records to the store
-	SaveAggregate(ctx context.Context, aggregate Aggregate, records ...Record) error
+	SaveAggregate(ctx context.Context, aggregateID string, aggregate Aggregate, records ...Record) error
 }
 
 // memoryStore provides an in-memory implementation of Store
