@@ -4,6 +4,8 @@ import (
 	"context"
 	"sort"
 	"sync"
+
+	"golang.org/x/xerrors"
 )
 
 // Record provides the serialized representation of the event
@@ -44,6 +46,14 @@ type Store interface {
 	Load(ctx context.Context, aggregateID string, fromVersion, toVersion int) (History, error)
 }
 
+// StoreAggregate provides an alternative to Store that allows the aggregate to
+// be saved at the same time as the events.  When the Store implement StoreAggregate,
+// the SaveAggregate will always be called instead of Store
+type StoreAggregate interface {
+	// Save the provided serialized records to the store
+	SaveAggregate(ctx context.Context, aggregate Aggregate, records ...Record) error
+}
+
 // memoryStore provides an in-memory implementation of Store
 type memoryStore struct {
 	mux        *sync.Mutex
@@ -72,7 +82,7 @@ func (m *memoryStore) Save(ctx context.Context, aggregateID string, records ...R
 func (m *memoryStore) Load(ctx context.Context, aggregateID string, fromVersion, toVersion int) (History, error) {
 	all, ok := m.eventsByID[aggregateID]
 	if !ok {
-		return nil, NewError(nil, ErrAggregateNotFound, "no aggregate found with id, %v", aggregateID)
+		return nil, xerrors.Errorf("no aggregate found with id, %v: %w", aggregateID, errAggregateNotFound)
 	}
 
 	history := make(History, 0, len(all))

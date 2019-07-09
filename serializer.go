@@ -3,6 +3,8 @@ package eventsource
 import (
 	"encoding/json"
 	"reflect"
+
+	"golang.org/x/xerrors"
 )
 
 // Serializer converts between Events and Records
@@ -46,7 +48,7 @@ func (j *JSONSerializer) MarshalEvent(v Event) (Record, error) {
 		Data: json.RawMessage(data),
 	})
 	if err != nil {
-		return Record{}, NewError(err, ErrInvalidEncoding, "unable to encode event")
+		return Record{}, xerrors.Errorf("unable to encode event: %v: %w", err, errInvalidEncoding)
 	}
 
 	return Record{
@@ -60,18 +62,18 @@ func (j *JSONSerializer) UnmarshalEvent(record Record) (Event, error) {
 	wrapper := jsonEvent{}
 	err := json.Unmarshal(record.Data, &wrapper)
 	if err != nil {
-		return nil, NewError(err, ErrInvalidEncoding, "unable to unmarshal event")
+		return nil, xerrors.Errorf("unable to unmarshal event: %v: %w", err, errInvalidEncoding)
 	}
 
 	t, ok := j.eventTypes[wrapper.Type]
 	if !ok {
-		return nil, NewError(err, ErrUnboundEventType, "unbound event type, %v", wrapper.Type)
+		return nil, xerrors.Errorf("unbound event type, %v: %v: %w", wrapper.Type, err, errUnboundEventType)
 	}
 
 	v := reflect.New(t).Interface()
 	err = json.Unmarshal(wrapper.Data, v)
 	if err != nil {
-		return nil, NewError(err, ErrInvalidEncoding, "unable to unmarshal event data into %#v", v)
+		return nil, xerrors.Errorf("unable to unmarshal event data into %#v: %v: %w", v, err, errInvalidEncoding)
 	}
 
 	return v.(Event), nil

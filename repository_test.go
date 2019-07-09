@@ -2,9 +2,8 @@ package eventsource_test
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io/ioutil"
-	"reflect"
 	"testing"
 	"time"
 
@@ -42,7 +41,7 @@ func (item *Entity) On(event eventsource.Event) error {
 		item.UpdatedAt = v.Model.At
 
 	default:
-		return errors.New(eventsource.ErrUnhandledEvent)
+		return fmt.Errorf("boom")
 	}
 
 	return nil
@@ -75,30 +74,17 @@ func (item *Entity) Apply(ctx context.Context, command eventsource.Command) ([]e
 	}
 }
 
-func TestNew(t *testing.T) {
-	repository := eventsource.New(&Entity{})
-	aggregate := repository.New()
-	if got := aggregate; got == nil {
-		t.Fatalf("got nil; want not nil")
-	}
-
-	want := &Entity{}
-	if got := aggregate; !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %v; want not %v", got, want)
-	}
-}
-
 func TestRepository_Load_NotFound(t *testing.T) {
 	ctx := context.Background()
 	repository := eventsource.New(&Entity{},
 		eventsource.WithDebug(ioutil.Discard),
 	)
 
-	_, err := repository.Load(ctx, "does-not-exist")
+	_, _, err := repository.Load(ctx, "does-not-exist")
 	if err == nil {
 		t.Fatalf("got nil; want not nil")
 	}
-	if !eventsource.IsNotFound(err) {
+	if !eventsource.IsNotFoundError(err) {
 		t.Fatalf("got false; want true")
 	}
 }
@@ -133,9 +119,12 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("got %v; want nil", err)
 		}
 
-		v, err := repository.Load(ctx, id)
+		v, n, err := repository.Load(ctx, id)
 		if err != nil {
 			t.Fatalf("got %v; want nil", err)
+		}
+		if got, want := n, 1; got != want {
+			t.Fatalf("got %v; want %v", got, want)
 		}
 
 		org, ok := v.(*Entity)
@@ -160,7 +149,7 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("got %v; want nil", err)
 		}
 
-		v, err = repository.Load(ctx, id)
+		v, _, err = repository.Load(ctx, id)
 		if err != nil {
 			t.Fatalf("got %v; want nil", err)
 		}
@@ -195,7 +184,7 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("got %v; want nil", err)
 		}
 
-		v, err := registry.Load(ctx, id)
+		v, _, err := registry.Load(ctx, id)
 		if err != nil {
 			t.Fatalf("got %v; want nil", err)
 		}
@@ -219,7 +208,7 @@ func TestRegistry(t *testing.T) {
 			t.Fatalf("got %v; want nil", err)
 		}
 
-		v, err := registry.Load(ctx, id)
+		v, _, err := registry.Load(ctx, id)
 		if err != nil {
 			t.Fatalf("got %v; want nil", err)
 		}
@@ -246,7 +235,7 @@ func TestAt(t *testing.T) {
 		t.Fatalf("got %v; want nil", err)
 	}
 
-	v, err := registry.Load(ctx, id)
+	v, _, err := registry.Load(ctx, id)
 	if err != nil {
 		t.Fatalf("got %v; want nil", err)
 	}
@@ -288,7 +277,7 @@ func TestWithObservers(t *testing.T) {
 	ctx := context.Background()
 
 	// When I dispatch command
-	err := repository.Dispatch(ctx, &CreateEntity{
+	_, err := repository.Apply(ctx, &CreateEntity{
 		CommandModel: eventsource.CommandModel{ID: "abc"},
 	})
 

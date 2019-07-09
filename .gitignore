@@ -8,3 +8,5 @@
 # ignore local configs
 #
 *.env
+go.sum
+
