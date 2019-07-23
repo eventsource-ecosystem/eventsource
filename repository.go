@@ -203,7 +203,7 @@ func (r *Repository) Apply(ctx context.Context, command Command) (int, error) {
 			}
 		}
 
-		if err := store.SaveAggregate(ctx, aggregate, records...); err != nil {
+		if err := store.SaveAggregate(ctx, aggregateID, aggregate, records...); err != nil {
 			return 0, err
 		}
 
