@@ -46,12 +46,27 @@ type Store interface {
 	Load(ctx context.Context, aggregateID string, fromVersion, toVersion int) (History, error)
 }
 
+// Deprecated - use AggregateSaver  instead
+//
 // StoreAggregate provides an alternative to Store that allows the aggregate to
 // be saved at the same time as the events.  When the Store implement StoreAggregate,
 // the SaveAggregate will always be called instead of Store
 type StoreAggregate interface {
 	// Save the provided serialized records to the store
 	SaveAggregate(ctx context.Context, aggregateID string, aggregate Aggregate, records ...Record) error
+}
+
+// SaveAggregateInput includes additional fields that simplify the saving of Aggregates
+type SaveAggregateInput struct {
+	AggregateID string    // AggregateID
+	Aggregate   Aggregate // Aggregate (with all the events applied)
+	Events      []Event   // Events that were applied
+	Records     []Record  // Records to be persisted e.g. the serialized events
+}
+
+// AggregateSaver provides a custom interface to save aggregates
+type AggregateSaver interface {
+	SaveAggregate(ctx context.Context, input SaveAggregateInput) error
 }
 
 // memoryStore provides an in-memory implementation of Store

@@ -196,7 +196,24 @@ func (r *Repository) Apply(ctx context.Context, command Command) (int, error) {
 		return 0, err
 	}
 
-	if store, ok := r.store.(StoreAggregate); ok {
+	if saver, ok := r.store.(AggregateSaver); ok {
+		for _, event := range events {
+			if err := aggregate.On(event); err != nil {
+				return 0, fmt.Errorf("unable to apply generated events to aggregate, %v: %v", aggregateID, err)
+			}
+		}
+
+		input := SaveAggregateInput{
+			AggregateID: aggregateID,
+			Aggregate:   aggregate,
+			Events:      events,
+			Records:     records,
+		}
+		if err := saver.SaveAggregate(ctx, input); err != nil {
+			return 0, err
+		}
+
+	} else if store, ok := r.store.(StoreAggregate); ok {
 		for _, event := range events {
 			if err := aggregate.On(event); err != nil {
 				return 0, fmt.Errorf("unable to apply generated events to aggregate, %v: %v", aggregateID, err)
@@ -207,7 +224,7 @@ func (r *Repository) Apply(ctx context.Context, command Command) (int, error) {
 			return 0, err
 		}
 
-	} else if err := r.Save(ctx, events...); err != nil {
+	} else if err := r.store.Save(ctx, aggregateID, records...); err != nil {
 		return 0, err
 	}
 
